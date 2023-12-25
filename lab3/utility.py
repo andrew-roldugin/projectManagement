@@ -2,11 +2,13 @@ from random import choice
 from copy import copy
 from typing import Tuple
 
+
 class TimeCapacityNode:
     """
     Вспомогательная структура связного списка моментов времени и 
     имеющихся в них остаточных запасов ресурсов
     """
+
     def __init__(self, time: int, capacity: list[int]):
         self.time = time
         self.capacity = capacity
@@ -41,6 +43,7 @@ class TimeCapacityNode:
         for i in range(len(self.capacity)):
             self.capacity[i] -= demand[i]
 
+
 class ActivityListDecoder:
     def decode(
             self, activity_list: list[int], duration: list[int],
@@ -61,7 +64,7 @@ class ActivityListDecoder:
             list[int]: времена начала работ
         """
         count = len(activity_list)
-        root_node = TimeCapacityNode(0, copy(renewable_capacity)) # Связный список моментов изменения запаса ресурсов
+        root_node = TimeCapacityNode(0, copy(renewable_capacity))  # Связный список моментов изменения запаса ресурсов
         starts = [0] * count
         finish_nodes = [root_node] * count
 
@@ -94,10 +97,10 @@ class ActivityListDecoder:
             node = node.next
 
     def _find_position(
-            self, start_node: int, duration: int, demand: list[int]
-            ) -> Tuple[TimeCapacityNode, TimeCapacityNode, TimeCapacityNode, int]:
+            self, start_node: TimeCapacityNode, duration: int, demand: list[int]
+    ) -> Tuple[TimeCapacityNode, TimeCapacityNode, TimeCapacityNode, int]:
         if not duration:
-            return (start_node, start_node, start_node, start_node.time)
+            return start_node, start_node, start_node, start_node.time
 
         finish_time = start_node.time + duration
         t = start_node.find_first(finish_time)
@@ -117,7 +120,8 @@ class ActivityListDecoder:
                 else:
                     break
 
-        return (start_node, last_node, last_node.next, finish_time)
+        return start_node, last_node, last_node.next, finish_time
+
 
 class ActivityListSampler:
     def __init__(
@@ -130,7 +134,8 @@ class ActivityListSampler:
         self.predecessors = predecessors
         self.size = len(predecessors)
         if not successors:
-            successors = [[succ for succ in range(self.size) if i in predecessors[succ]] for i in range(self.size)]
+            successors = [[successor for successor in range(self.size) if i in predecessors[successor]]
+                          for i in range(self.size)]
         self.successors = successors
 
     def generate(self) -> list[int]:
@@ -144,7 +149,7 @@ class ActivityListSampler:
             list[int]: Activity List
         """
         result = []
-        ramain_predecessors = [set(pred) for pred in self.predecessors]
+        remain_predecessors = [set(pred) for pred in self.predecessors]
         ready_set = [i for i in range(self.size) if not self.predecessors[i]]
 
         for _ in range(self.size):
@@ -156,8 +161,8 @@ class ActivityListSampler:
             result.append(next_activity)
 
             for successor in self.successors[next_activity]:
-                ramain_predecessors[successor].remove(next_activity)
-                if not ramain_predecessors[successor]:
+                remain_predecessors[successor].remove(next_activity)
+                if not remain_predecessors[successor]:
                     ready_set.append(successor)
-        
+
         return result

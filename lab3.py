@@ -1,5 +1,5 @@
 import json
-from utility import ActivityListDecoder, ActivityListSampler
+from lab3.utility import ActivityListDecoder, ActivityListSampler
 
 
 def find_best_mode(modes):
@@ -43,7 +43,7 @@ def f(T: int,
         return max(start_times)
 
 
-with open('13.json') as json_data:
+with open('lab3/13.json') as json_data:
     data = json.load(json_data)
 
 predecessors = []  # индексы предшествующих работ
