@@ -47,3 +47,7 @@ class Solution:
     def __init__(self, activity_list: list[int], modes: dict[int, Mode]):
         self.activity_list = activity_list
         self.modes = modes
+
+    def __eq__(self, other):
+        return self.activity_list == other.activity_list \
+               and self.modes == other.modes

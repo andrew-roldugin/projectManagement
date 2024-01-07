@@ -1,5 +1,6 @@
 import copy
 import json
+import random
 from typing import Generator, Any
 
 from domain import Project, Mode, Solution
@@ -63,24 +64,36 @@ def calculate_resource_error(schedule: list[int], modes: dict[int, Mode], nonren
         # цикл по работам 
         for j in schedule:
             n_jml = modes[j].nonrenewable_demand[l]  # затраты ресурса типа l для работы j в режиме m
-            sum += n_jml - Nl
-        SFT += max(0, sum)
+            sum += n_jml
+        SFT += max(0, sum - Nl)
     return SFT
 
 
+def get_mode(activity: int, proj: Project) -> Generator[Mode, Any, None]:
+    for m in proj.activities[activity].modes:
+        yield m
+
+
 # Оператор генерации нового решения в окрестности
-def generate_neighbor(activity_list) -> Generator[Solution, Any, None]:
+def generate_neighbor(current_solution: Solution, project: Project, use_random=True) -> Generator[
+    Solution, Any, None]:
+    activity_list = current_solution.activity_list
     for i in range(1, len(activity_list) - 1):
         j = i + 1
         if not is_valid_swap(activity_list[i], activity_list[j], activities):
             continue
 
-        modes_combination = {activity: find_best_mode(p.activities[activity].modes) for activity in activity_list}
-        # fitness_value = f(solution, modes_combination, project.nonrenewable_resources, project.horizon)
-
         neighbor = copy.deepcopy(activity_list)
         neighbor[i], neighbor[j] = neighbor[j], neighbor[i]  # обмен двух элементов
-        yield Solution(neighbor, modes_combination)
+
+        if use_random:
+            modes_combination = {activity: random.choice(project.activities[activity].modes) for activity in neighbor}
+            yield Solution(neighbor, modes_combination)
+        else:
+            for m in get_mode(i, project):
+                modes_combination = current_solution.modes
+                modes_combination[i] = m
+                yield Solution(neighbor, modes_combination)
 
 
 # получить случайное начальное решение
@@ -88,7 +101,8 @@ def get_initial_solution(p: Project) -> Solution:
     sampler = ActivityListSampler([activity.predecessors for activity in p.activities])
     random_activity_list = sampler.generate()
     # пусть каждая задача выполняется в первом режиме
-    modes = {idx: activity.modes[0] for idx, activity in enumerate(p.activities)}
+    # modes = {idx: activity.modes[0] for idx, activity in enumerate(p.activities)}
+    modes = {idx: find_best_mode(activity.modes) for idx, activity in enumerate(p.activities)}
     return Solution(random_activity_list, modes)
 
 
@@ -108,17 +122,19 @@ def f(solution: Solution, nonrenewable_resources: list[int], horizon: int):
 def tabu_search(p: Project, max_iterations: int = 100, max_tabu_list_size: int = 10):
     current_solution = get_initial_solution(p)  # Начальное решение
     best_candidate = copy.deepcopy(current_solution)
-    best_cost = calculate_project_duration(best_candidate)
+    best_cost = f(best_candidate, p.nonrenewable_resources, p.horizon)
     tabu_list = []
 
     for iteration in range(max_iterations):
-        for candidate in generate_neighbor(current_solution.activity_list):
-            v1 = f(candidate, p.nonrenewable_resources, p.horizon)
-            v2 = f(best_candidate, p.nonrenewable_resources, p.horizon)
-            if candidate not in tabu_list and v1 < v2:
-                best_candidate = candidate
+        best_candidate_cost = f(best_candidate, p.nonrenewable_resources, p.horizon)
+        for candidate in generate_neighbor(current_solution, p ,False):
+            value = f(candidate, p.nonrenewable_resources, p.horizon)
 
-        current_cost = calculate_project_duration(best_candidate)
+            if candidate not in tabu_list and value < best_candidate_cost:
+                best_candidate = candidate
+                best_candidate_cost = value
+
+        current_cost = f(best_candidate, p.nonrenewable_resources, p.horizon)
         # Обновление лучшего решения
         if current_cost < best_cost:
             current_solution = copy.deepcopy(best_candidate)
@@ -133,7 +149,7 @@ def tabu_search(p: Project, max_iterations: int = 100, max_tabu_list_size: int =
 
 
 MAX_TABU_SIZE = 15  # максимальное кол-во элементов в списке
-ITER_COUNT = 10000  # кол-во итераций
+ITER_COUNT = 15000  # кол-во итераций
 
 if __name__ == '__main__':
     with open('13.json') as json_data:
